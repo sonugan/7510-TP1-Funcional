@@ -98,20 +98,6 @@
   )
 )
 
-;Aplica la query a la sentencia
-(defmulti evaluate (fn [sentence query] (getTypeExpression sentence)))
-
-(defmethod evaluate Fact [sentence query]
-  (if ( = sentence nil )
-    false
-    true
-  )
-)
-
-(defmethod evaluate Rule [sentence query]
-  false
-)
-
 (defn hasInvalidSentences [parsedDatabase]
   "Indica si la base de datos tiene sentencias que no cumplen con el formato correcto"
   (some false? (map hasValidFormat parsedDatabase))
@@ -142,17 +128,36 @@
   "dada una lista de variables y de valores, reemplaza en la sentencia la primer variable por el primer valor"
   (if (>(count params) 0)
       (do
-        (str/replace sentence (last params) (last replacements))    
-        (replaceFirstParam sentence (butlast params) (butlast replacements))
+        (replaceFirstParam 
+          (str/replace sentence (last params) (last replacements)) 
+          (butlast params) 
+          (butlast replacements)
+        )
       )
+      sentence
   )
 )
 
 (defn replaceParams [sentence, params]
   "Reemplaza todas las variables de la sentencia por los parametros dados"
   (let [parameters (getRuleParams sentence)]
-       (replaceFirstParam sentence parameters params)
+    (replaceFirstParam sentence parameters params)
   )
+)
+
+;Aplica la query a la sentencia
+(defmulti evaluate (fn [sentence query] (getTypeExpression sentence)))
+
+(defmethod evaluate Fact [sentence query]
+  (if ( = sentence nil ) ;;TODO: sentence == query?
+    false
+    true
+  )
+)
+
+(defmethod evaluate Rule [sentence query]
+  (println (replaceParams sentence (getRuleParams query)))
+  false
 )
 
 ;;pruebas
@@ -176,30 +181,49 @@
   either input can't be parsed, returns nil"
   [database query]
 
-  ;antes de leer la base, tengo que borrar las lineas en blanco
-
-  ;parseo la base
-  (let [parsedDatabase (getAllDatabaseSentences parent-database)]
-  ;si no es valida la base, muestro un mensaje de error
-  ; (if (hasInvalidSentences parsedDatabase)
-  ;   (println "La base de datos tiene sentencias incorrectas"))
-  
-  ;quitar los espacios de la query y validarla
-
-  ;veo si existe la query en la base -> si no existe retorno nil
-
-  (let [sentence (getDatabaseSentence parsedDatabase query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
-  (if (= sentence nil)
-    nil
+  ;La query es válida?
+  (if (not (hasValidFormat query))
+    (println "La consulta tiene un formato incorrecto")
     (do
-      (evaluate sentence query)
+      ;antes de leer la base, tengo que borrar las lineas en blanco
+
+      ;parseo la base
+      (let [parsedDatabase (getAllDatabaseSentences parent-database)]
+        ;si no es valida la base, muestro un mensaje de error
+        ; (if (hasInvalidSentences parsedDatabase)
+        ;   (println "La base de datos tiene sentencias incorrectas"))
+        
+        ;quitar los espacios de la query y validarla
+
+        ;veo si existe la query en la base -> si no existe retorno nil
+        (let [sentence (getDatabaseSentence parsedDatabase query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
+        (if (= sentence nil)
+          nil
+          (do
+            (evaluate sentence query)
+          )
+        ))
+      )
     )
-  ))
-))
+  )
+)
 
+; (println (evaluate-query parent-database "varon(maria)"))
+; (println (evaluate-query parent-database "varon(juan)"))
+; (println (evaluate-query parent-database "mujer(maria)"))
+;(println (evaluate-query parent-database "hija(maria,hector)"))
 
-(println (evaluate-query parent-database "varon(maria)"))
- (println (evaluate-query parent-database "varon(juan)"))
-(println (evaluate-query parent-database "mujer(maria)"))
-(println (evaluate-query parent-database "hija(maria,hector)"))
+(defn getRuleComponents [sentence]
+  "Retorna los componentes de una rule. Dada r(X):-a(X),b(X) retorna [a(X) b(X)"
+  (str/split (str/replace sentence #"^([^:]*:\-)" "") #",")
+)
+
+(defn evaluateList [factList query]
+  "Dada una lista de Facts, las evalua contra la base de datos y retorna true si todas son verdaderas"
+  (every? true? 
+    (map (fn [x] (evaluate x query)) factList)
+  )
+)
+
+(println (evaluateList (getRuleComponents(replaceParams "hija(X,Y):-mujer(X),padre(Y,X)" ["pepe" "pipo"])) "hija(pipa,popo)"))
 
