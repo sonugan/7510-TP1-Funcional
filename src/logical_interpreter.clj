@@ -2,7 +2,7 @@
 (require '[clojure.string :as str])
 
 (def parent-database "
-	varon(juan).
+  varon(juan).
 	varon(pepe).
 	varon(hector).
 	varon(roberto).
@@ -53,7 +53,7 @@
     ( = (count (getRuleParams sentence)) (count (getRuleParams query)))
   )
 )
-(defmethod compareSentence :default [sentence query] true)
+(defmethod compareSentence :default [sentence query] false)
 
 ; ;Evalua el valor de verdad de la query contra una sentencia que puede ser una Rule o una Fact
 ; (defmulti evaluate (fn [sentence, query] getTypeExpression sentence))
@@ -87,9 +87,14 @@
 
 (defn getDatabaseSentence [database query]
   "Retorna, si existe la primer sentencia de la base de datos que matchea con la consulta"
-  ( filter 
-    (fn [s] (compareSentence s query)) 
-    database
+  (let [sentences ( filter 
+      (fn [s] (compareSentence s query)) 
+      database
+    )]
+    (if (> (count sentences) 0)
+      (first sentences)
+      nil
+    )
   )
 )
 
@@ -101,6 +106,10 @@
     false
     true
   )
+)
+
+(defmethod evaluate Rule [sentence query]
+  false
 )
 
 (defn hasInvalidSentences [parsedDatabase]
@@ -123,7 +132,7 @@
 
 (defn getAllDatabaseSentences [database]
   "Retorna una lista de las Facts y Rules de la base de datos"
-  (map cleanSentence (removeAllEmptySentences (str/split database #"\n"))))
+  (removeAllEmptySentences (map cleanSentence (str/split database #"\n"))))
 
 (defn getSentenceName [sentence]
   "Retorna el nombre de la sentencia"
@@ -167,9 +176,10 @@
   either input can't be parsed, returns nil"
   [database query]
 
+  ;antes de leer la base, tengo que borrar las lineas en blanco
+
   ;parseo la base
   (let [parsedDatabase (getAllDatabaseSentences parent-database)]
-  
   ;si no es valida la base, muestro un mensaje de error
   ; (if (hasInvalidSentences parsedDatabase)
   ;   (println "La base de datos tiene sentencias incorrectas"))
@@ -182,11 +192,14 @@
   (if (= sentence nil)
     nil
     (do
-      (println (evaluate sentence query))
+      (evaluate sentence query)
     )
   ))
-  ;veo el valor de verdad de la query
-  nil))
+))
 
-(evaluate-query parent-database "varon(juan)")
-(evaluate-query parent-database "varon(maria)")
+
+(println (evaluate-query parent-database "varon(maria)"))
+ (println (evaluate-query parent-database "varon(juan)"))
+(println (evaluate-query parent-database "mujer(maria)"))
+(println (evaluate-query parent-database "hija(maria,hector)"))
+
