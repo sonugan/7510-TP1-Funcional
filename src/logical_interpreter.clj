@@ -1,6 +1,8 @@
 (ns logical-interpreter)
 (require '[clojure.string :as str])
 
+(declare evaluate-query)
+
 (def parent-database "
   varon(juan).
 	varon(pepe).
@@ -145,20 +147,49 @@
   )
 )
 
-;Aplica la query a la sentencia
-(defmulti evaluate (fn [sentence query] (getTypeExpression sentence)))
-
-(defmethod evaluate Fact [sentence query]
-  (if ( = sentence nil ) ;;TODO: sentence == query?
-    false
-    true
+(defn evaluateList [database factList]
+  "Dada una lista de Facts, las evalua contra la base de datos y retorna true si todas son verdaderas"
+  (every? true? 
+    (map (fn [x] (evaluate-query database x)) factList)
   )
 )
 
-(defmethod evaluate Rule [sentence query]
-  (println (replaceParams sentence (getRuleParams query)))
-  false
+(defn getRuleComponents [sentence]
+  "Retorna los componentes de una rule. Dada r(X):-a(X),b(X) retorna [a(X) b(X)]"
+  (str/split 
+    (str/replace ;reemplazo las comas separadoras de facts por pipes para poder hacer el split sin que separe los parametros de los facts
+      (str/replace sentence #"^([^:]*:\-)" "") 
+      #"\)," 
+      ")|") 
+    #"\|"
+  )
 )
+
+;Aplica la query a la sentencia
+(defmulti evaluate (fn [database sentence query] (getTypeExpression sentence)))
+
+(defmethod evaluate Fact [database sentence query]
+  (if ( = sentence query ) ;;TODO: sentence == query?
+    true
+    false
+  )
+)
+
+(defmethod evaluate Rule [database sentence query]
+  (evaluateList database (getRuleComponents (replaceParams sentence (getRuleParams query))))
+)
+
+; (defn evaluateQuery [database query]
+;   "Retorna el resultado de evaluar la query en la base de datos parseada"
+;   (let [sentence (getDatabaseSentence database query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
+;      (if (= sentence nil)
+;       nil
+;       (do
+;         (evaluate database sentence query)
+;       )
+;     )
+;   )
+; )
 
 ;;pruebas
 ;(println parsedDatabase)
@@ -180,7 +211,6 @@
   "Returns true if the rules and facts in database imply query, false if not. If
   either input can't be parsed, returns nil"
   [database query]
-
   ;La query es válida?
   (if (not (hasValidFormat query))
     (println "La consulta tiene un formato incorrecto")
@@ -194,15 +224,14 @@
         ;   (println "La base de datos tiene sentencias incorrectas"))
         
         ;quitar los espacios de la query y validarla
-
-        ;veo si existe la query en la base -> si no existe retorno nil
         (let [sentence (getDatabaseSentence parsedDatabase query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
-        (if (= sentence nil)
-          nil
-          (do
-            (evaluate sentence query)
+          (if (= sentence nil)
+            nil
+            (do
+              (evaluate database sentence query)
+            )
           )
-        ))
+        )
       )
     )
   )
@@ -211,19 +240,10 @@
 ; (println (evaluate-query parent-database "varon(maria)"))
 ; (println (evaluate-query parent-database "varon(juan)"))
 ; (println (evaluate-query parent-database "mujer(maria)"))
-;(println (evaluate-query parent-database "hija(maria,hector)"))
+; (println (evaluate-query parent-database "hijo(pepe,juan)"))
+; (println (evaluate-query parent-database "hijo(pepe,juana)"))
 
-(defn getRuleComponents [sentence]
-  "Retorna los componentes de una rule. Dada r(X):-a(X),b(X) retorna [a(X) b(X)"
-  (str/split (str/replace sentence #"^([^:]*:\-)" "") #",")
-)
 
-(defn evaluateList [factList query]
-  "Dada una lista de Facts, las evalua contra la base de datos y retorna true si todas son verdaderas"
-  (every? true? 
-    (map (fn [x] (evaluate x query)) factList)
-  )
-)
 
-(println (evaluateList (getRuleComponents(replaceParams "hija(X,Y):-mujer(X),padre(Y,X)" ["pepe" "pipo"])) "hija(pipa,popo)"))
+;(println (evaluateList (getRuleComponents(replaceParams "hija(X,Y):-mujer(X),padre(Y,X)" ["pepe" "pipo"])) "hija(pipa,popo)"))
 
