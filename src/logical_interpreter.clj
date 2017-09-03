@@ -3,22 +3,22 @@
 
 (declare evaluate-query)
 
-(def parent-database "
-  varon(juan).
-	varon(pepe).
-	varon(hector).
-	varon(roberto).
-	varon(alejandro).
-	mujer(maria).
-	mujer(cecilia).
-	padre(juan, pepe).
-	padre(juan, pepa).
-	padre(hector, maria).
-	padre(roberto, alejandro).
-	padre(roberto, cecilia).
-	hijo(X, Y) :- varon(X), padre(Y, X).
-	hija(X, Y) :- mujer(X), padre(Y, X).
-")
+; (def parent-database "
+;   varon(juan).
+; 	varon(pepe).
+; 	varon(hector).
+; 	varon(roberto).
+; 	varon(alejandro).
+; 	mujer(maria).
+; 	mujer(cecilia).
+; 	padre(juan, pepe).
+; 	padre(juan, pepa).
+; 	padre(hector, maria).
+; 	padre(roberto, alejandro).
+; 	padre(roberto, cecilia).
+; 	hijo(X, Y) :- varon(X), padre(Y, X).
+; 	hija(X, Y) :- mujer(X), padre(Y, X).
+; ")
 
 (deftype Fact [expression])
 (deftype Rule [expression])
@@ -44,6 +44,10 @@
 ;Si sentence es una Rule, indica si tiene el mismo nombre y parametros que la query dada
 (defmulti compareSentence (fn [sentence query] (getTypeExpression sentence)))
 (defmethod compareSentence Fact [sentence query] 
+  ; (if ( = (getSentenceName sentence) (getSentenceName query))
+  ;   ( = (getParameters sentence) (getParameters query))
+  ; )
+
   (and 
     ( = (getSentenceName sentence) (getSentenceName query))
     ( = (getParameters sentence) (getParameters query))
@@ -218,17 +222,19 @@
       ;antes de leer la base, tengo que borrar las lineas en blanco
 
       ;parseo la base
-      (let [parsedDatabase (getAllDatabaseSentences parent-database)]
+      (let [parsedDatabase (getAllDatabaseSentences database)]
         ;si no es valida la base, muestro un mensaje de error
         ; (if (hasInvalidSentences parsedDatabase)
         ;   (println "La base de datos tiene sentencias incorrectas"))
         
         ;quitar los espacios de la query y validarla
-        (let [sentence (getDatabaseSentence parsedDatabase query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
+        (let [
+          cleanQuery (cleanSentence query)
+          sentence (getDatabaseSentence parsedDatabase cleanQuery)];TODO: tomar solo una sentence, para el caso en que esté repetidas
           (if (= sentence nil)
             nil
             (do
-              (evaluate database sentence query)
+              (evaluate database sentence cleanQuery)
             )
           )
         )
@@ -243,6 +249,8 @@
 ; (println (evaluate-query parent-database "hijo(pepe,juan)"))
 ; (println (evaluate-query parent-database "hijo(pepe,juana)"))
 
+
+(println (compareSentence "varon(pepe)" "varon(maria)"))
 
 
 ;(println (evaluateList (getRuleComponents(replaceParams "hija(X,Y):-mujer(X),padre(Y,X)" ["pepe" "pipo"])) "hija(pipa,popo)"))
