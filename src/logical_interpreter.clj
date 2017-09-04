@@ -3,22 +3,31 @@
 
 (declare evaluate-query)
 
-; (def parent-database "
-;   varon(juan).
-; 	varon(pepe).
-; 	varon(hector).
-; 	varon(roberto).
-; 	varon(alejandro).
-; 	mujer(maria).
-; 	mujer(cecilia).
-; 	padre(juan, pepe).
-; 	padre(juan, pepa).
-; 	padre(hector, maria).
-; 	padre(roberto, alejandro).
-; 	padre(roberto, cecilia).
-; 	hijo(X, Y) :- varon(X), padre(Y, X).
-; 	hija(X, Y) :- mujer(X), padre(Y, X).
-; ")
+;Nombre de las sentencias: facts, rules y queries
+(def formatSentenceName "[a-zA-Z0-9]{1,}")
+
+;Parametros de las rules
+(def formatRuleParams "\\([A-Z](,[A-Z]){0,}\\)")
+
+(def formatFactQueryParams "\\([a-z0-9]{1,}(,[a-z0-9]{1,}){0,}\\)")
+
+;Componentes de las rules
+(def formatComponents (str formatSentenceName "\\([A-Z](,[A-Z]){0,}\\)(," formatSentenceName "\\([A-Z](,[A-Z]){0,}\\)){0,}"))
+
+(def formatAllRuleParams "\\(([^)]+)\\)")
+
+(def regFactQueryParams (re-pattern formatFactQueryParams))
+
+(def regAllRuleParams (re-pattern formatAllRuleParams))
+
+;Caracteres a remover de todas las sentencias
+(def regRemoveCharacters #"[ \. \t]")
+
+;Regular expression que define el formato válido de una Rule
+(def regRule (re-pattern (str "^" formatSentenceName formatRuleParams ":-" formatComponents "$")))
+
+;Regular expression que define el formato valido de una Fact
+(def regFact (re-pattern (str "^" formatSentenceName formatFactQueryParams "$")))
 
 (deftype Fact [expression])
 (deftype Rule [expression])
@@ -33,7 +42,7 @@
 ;nombre(param1,param2)
 (defn getParameters [sentence]
   "Retorna los parametros de la sentencia" 
-  (let [regexResult (re-find (re-matcher #"(\(){1,1}[^\(\)]{1,}(\)){1,1}" sentence))]
+  (let [regexResult (re-find (re-matcher regFactQueryParams sentence))]
     (if (> (count regexResult) 0)
       (nth regexResult 0)
       []
@@ -42,7 +51,7 @@
 )
 (defn getRuleParams [sentence]
   "Retorna los parametros de entrada de una Rule"
-  (let [matchs (re-matcher #"\(([^)]+)\)" sentence)]
+  (let [matchs (re-matcher regAllRuleParams sentence)]
   (str/split (nth (re-find matchs) 1) #",")))
 
 (defmulti canEvaluate (fn [query sentence] (getTypeExpression sentence)))
@@ -69,10 +78,6 @@
 ;Si sentence es una Rule, indica si tiene el mismo nombre y parametros que la query dada
 (defmulti compareSentence (fn [sentence query] (getTypeExpression sentence)))
 (defmethod compareSentence Fact [sentence query] 
-  ; (if ( = (getSentenceName sentence) (getSentenceName query))
-  ;   ( = (getParameters sentence) (getParameters query))
-  ; )
-
   (and 
     ( = (getSentenceName sentence) (getSentenceName query))
     ( = (getParameters sentence) (getParameters query))
@@ -86,19 +91,13 @@
 )
 (defmethod compareSentence :default [sentence query] false)
 
-; ;Evalua el valor de verdad de la query contra una sentencia que puede ser una Rule o una Fact
-; (defmulti evaluate (fn [sentence, query] getTypeExpression sentence))
-; (defmethod evaluate Fact [sentence, query]
-; 	(= sentence query))
-
 ; ;Chequea si la sentencia tiene un formato válido
 (defmulti hasValidFormat (fn [sentence] (getTypeExpression sentence)))
  (defmethod hasValidFormat Fact [sentence]
- ;\([^\( \) \: \-]{1,},[^\( \) \: \-]{1,}\)
   ( >
     ( count 
       ( re-find 
-        ( re-matcher #"^([^\(\)\:\-]{1,})(\([^\(\)\:\-\,]{1,})(,[^\(\)\:\-\,]{1,}){0,}\)$" sentence )
+        ( re-matcher regFact sentence )
       )
     ) 0
   )
@@ -108,7 +107,7 @@
   ( >
     ( count 
       ( re-find 
-        ( re-matcher #"^[a-zA-Z0-9]{1,}\([A-Z](,[A-Z]){0,}\):-[a-zA-Z0-9]{1,}\([A-Z](,[A-Z]){0,}\)(,[a-zA-Z0-9]{1,}\([A-Z](,[A-Z]){0,}\)){0,}$" sentence )
+        ( re-matcher regRule sentence )
       )
     ) 0
   )
@@ -141,12 +140,8 @@
 
 (defn cleanSentence [sentence]
 "Remueve de la sentencia los blancos, el punto del final y tabs al inicio si es que los hubiera"
-  (str/replace sentence #"[ \. \t]" "")
+  (str/replace sentence regRemoveCharacters "")
 )
-
-; (defn isEmptySentence [sentence]
-;   "Indica si la sentencia está vacía"
-;   (re-find (re-matcher #"(^[ \t]*\n)" sentence)))
 
 (defn removeAllEmptySentences [database]
   "Remueve todas las sentencias vacias"
@@ -154,7 +149,7 @@
 
 (defn getAllDatabaseSentences [database]
   "Retorna una lista de las Facts y Rules de la base de datos"
-  (removeAllEmptySentences (map cleanSentence (str/split database #"\n"))))
+  (removeAllEmptySentences (map cleanSentence (str/split-lines database))))
 
 (defn getSentenceName [sentence]
   "Retorna el nombre de la sentencia"
@@ -205,7 +200,7 @@
 (defmethod evaluate Fact [database sentence query]
   (if (= sentence nil)
     false
-    (if ( = sentence query ) ;;TODO: sentence == query?
+    (if ( = sentence query )
       true
       false
     )
@@ -218,57 +213,26 @@
     (evaluateList database (getRuleComponents (replaceParams sentence (getRuleParams query))))
   )
 )
-
-; (defn evaluateQuery [database query]
-;   "Retorna el resultado de evaluar la query en la base de datos parseada"
-;   (let [sentence (getDatabaseSentence database query)];TODO: tomar solo una sentence, para el caso en que esté repetidas
-;      (if (= sentence nil)
-;       nil
-;       (do
-;         (evaluate database sentence query)
-;       )
-;     )
-;   )
-; )
-
-;;pruebas
-;(println parsedDatabase)
-;(println (map (fn[s] (str "'" s "'")) parsedDatabase))
-
-
-;(println (parse parent-database))
-;(println (count (parse parent-database)))
-;(println (map (fn[sentence] (re-find (re-matcher #"^([^\( \) \: \-]{1,})" sentence))) (parse parent-database)))
-;(println (re-find (re-matcher #"^[^\( \) \: \-]{1,}" "padre(hector, maria)")))
-
-;^[^\(\)\:\-]{1,}\(([^\(\)\:\-]{1,}[,]{0,1}){1,}\)
-
-
-;para una rule, primero reemplazo los parametros que me pasa la query y despues ejecuto cada una de las facts que se arman con una and
-
-
 (defn evaluate-query
   "Returns true if the rules and facts in database imply query, false if not. If
   either input can't be parsed, returns nil"
   [database query]
   ;La query es válida?
-  (if (not (hasValidFormat query))
-    (println (str "La consulta tiene un formato incorrecto"))
-    (do
-      ;antes de leer la base, tengo que borrar las lineas en blanco
-      ;parseo la base
-      (let [parsedDatabase (getAllDatabaseSentences database)]
-        ; (println (count parsedDatabase))
-        ; (println (count (filter (fn [x] (not (empty? x))) parsedDatabase)))
-        ;si no es valida la base, muestro un mensaje de error
-        (if (hasInvalidSentences parsedDatabase)
-          (do 
-            (println "La base de datos tiene sentencias incorrectas")
-            nil  
-          )
-          ;quitar los espacios de la query y validarla
-          (let [cleanQuery (cleanSentence query)]
-            (if (canEvaluateQuery parsedDatabase query)
+  (let [cleanQuery (cleanSentence query)]
+    (if (not (hasValidFormat cleanQuery))
+      (println (str "La consulta tiene un formato incorrecto"))
+      (do
+        ;antes de leer la base, tengo que borrar las lineas en blanco
+        ;parseo la base
+        (let [parsedDatabase (getAllDatabaseSentences database)]
+          ;si no es valida la base, muestro un mensaje de error
+          (if (hasInvalidSentences parsedDatabase)
+            (do 
+              (println "La base de datos tiene sentencias incorrectas")
+              nil  
+            )
+            ;quitar los espacios de la query y validarla
+            (if (canEvaluateQuery parsedDatabase cleanQuery)
               (let [sentence (getDatabaseSentence parsedDatabase cleanQuery)];TODO: tomar solo una sentence, para el caso en que esté repetidas
                 (evaluate database sentence cleanQuery)
               )
@@ -280,14 +244,4 @@
     )
   )
 )
-
- ;(println (evaluate-query parent-database "varon(maria)"))
-; (println (evaluate-query parent-database "varon(juan)"))
-; (println (evaluate-query parent-database "mujer(maria)"))
-; (println (evaluate-query parent-database "hijo(pepe,juan)"))
-; (println (evaluate-query parent-database "hijo(pepe,juana)"))
-; (println (evaluate-query parent-database "son(pepe,juana)"))
-
-
-;(println (evaluateList (getRuleComponents(replaceParams "hija(X,Y):-mujer(X),padre(Y,X)" ["pepe" "pipo"])) "hija(pipa,popo)"))
 
