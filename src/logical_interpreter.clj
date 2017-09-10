@@ -10,13 +10,15 @@
 ;Separador de parametros
 (def parameterSeparator ",")
 
-;Parametros de las rules
-(def formatRuleParams "\\([A-Z](,[A-Z]){0,}\\)")
+(def formatRuleParamsName "[A-Z]{1,}[_\\-0-9A-Z]*")
 
-(def formatFactQueryParams "\\([a-z0-9]{1,}(,[a-z0-9]{1,}){0,}\\)")
+;Parametros de las rules
+(def formatRuleParams (str "\\(" formatRuleParamsName "(," formatRuleParamsName "){0,}\\)"))
+
+(def formatFactQueryParams "\\([^\\( :-]{1,}(,[^\\( :-]{1,}){0,}\\)")
 
 ;Componentes de las rules
-(def formatComponents (str formatSentenceName "\\([A-Z](,[A-Z]){0,}\\)(," formatSentenceName "\\([A-Z](,[A-Z]){0,}\\)){0,}"))
+(def formatComponents (str formatSentenceName formatRuleParams "(," formatSentenceName formatRuleParams "){0,}"))
 
 (def formatAllRuleParams "\\(([^)]+)\\)")
 
