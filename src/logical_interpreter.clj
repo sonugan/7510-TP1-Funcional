@@ -3,8 +3,12 @@
 
 (declare evaluate-query)
 
+;;Se declaran regular expressions con los formatos que deben cumplir las sentencias y consultas
 ;Nombre de las sentencias: facts, rules y queries
-(def formatSentenceName "[a-zA-Z0-9]{1,}")
+(def formatSentenceName "[^/(]{1,}")
+
+;Separador de parametros
+(def parameterSeparator ",")
 
 ;Parametros de las rules
 (def formatRuleParams "\\([A-Z](,[A-Z]){0,}\\)")
@@ -21,7 +25,7 @@
 (def regAllRuleParams (re-pattern formatAllRuleParams))
 
 ;Caracteres a remover de todas las sentencias
-(def regRemoveCharacters #"[ \. \t]")
+(def regRemoveNoisyCharacters #"[ \. \t]")
 
 ;Regular expression que define el formato válido de una Rule
 (def regRule (re-pattern (str "^" formatSentenceName formatRuleParams ":-" formatComponents "$")))
@@ -32,12 +36,13 @@
 (deftype Fact [expression])
 (deftype Rule [expression])
 
+;Dado un string, si este contiene el caracter ":-", es una Rule
 (defn getTypeExpression [sentence] (if (or (= sentence nil) (str/includes? sentence ":-")) Rule Fact))
 
 ;nombre(param1,param2)
 (defn getSentenceName [sentence]
   "Retorna el nombre de la sentencia"
-  (re-find (re-matcher #"^[^\(]*" sentence)))
+  (re-find (re-matcher (re-pattern formatSentenceName) sentence)))
 
 ;nombre(param1,param2)
 (defn getParameters [sentence]
@@ -52,7 +57,7 @@
 (defn getRuleParams [sentence]
   "Retorna los parametros de entrada de una Rule"
   (let [matchs (re-matcher regAllRuleParams sentence)]
-  (str/split (nth (re-find matchs) 1) #",")))
+  (str/split (nth (re-find matchs) 1) (re-pattern parameterSeparator))))
 
 (defmulti canEvaluate (fn [query sentence] (getTypeExpression sentence)))
 (defmethod canEvaluate Fact [query sentence] 
@@ -93,25 +98,25 @@
 
 ; ;Chequea si la sentencia tiene un formato válido
 (defmulti hasValidFormat (fn [sentence] (getTypeExpression sentence)))
- (defmethod hasValidFormat Fact [sentence]
-  ( >
-    ( count 
-      ( re-find 
-        ( re-matcher regFact sentence )
-      )
-    ) 0
-  )
+(defmethod hasValidFormat Fact [sentence]
+ ( >
+   ( count 
+     ( re-find 
+       ( re-matcher regFact sentence )
+     )
+   ) 0
  )
+)
 
- (defmethod hasValidFormat Rule [sentence]
-  ( >
-    ( count 
-      ( re-find 
-        ( re-matcher regRule sentence )
-      )
-    ) 0
-  )
+(defmethod hasValidFormat Rule [sentence]
+ ( >
+   ( count 
+     ( re-find 
+       ( re-matcher regRule sentence )
+     )
+   ) 0
  )
+)
 
 (defmethod hasValidFormat :default [sentence] false) 
 
@@ -140,7 +145,7 @@
 
 (defn cleanSentence [sentence]
 "Remueve de la sentencia los blancos, el punto del final y tabs al inicio si es que los hubiera"
-  (str/replace sentence regRemoveCharacters "")
+  (str/replace sentence regRemoveNoisyCharacters "")
 )
 
 (defn removeAllEmptySentences [database]
@@ -150,10 +155,6 @@
 (defn getAllDatabaseSentences [database]
   "Retorna una lista de las Facts y Rules de la base de datos"
   (removeAllEmptySentences (map cleanSentence (str/split-lines database))))
-
-(defn getSentenceName [sentence]
-  "Retorna el nombre de la sentencia"
-  (re-find (re-matcher #"^[^\(]*" sentence)))
 
 (defn replaceFirstParam [sentence, params, replacements]
   "dada una lista de variables y de valores, reemplaza en la sentencia la primer variable por el primer valor"

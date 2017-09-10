@@ -54,3 +54,14 @@
   (testing "empty should be nil"
     (is (= (evaluate-query parent-database "")
            nil))))
+
+(deftest parent-database-wrong-parameters-query-test
+  (testing "hijo has two parameters not three should be nil"
+    (is (= (evaluate-query parent-database "hijo(maria,pepe,juan)")
+           nil)))
+  (testing "hijo has two parameters not zeroshould be nil"
+    (is (= (evaluate-query parent-database "hijo()")
+           nil)))
+  (testing "varon has one parameter should be nil"
+    (is (= (evaluate-query parent-database "varon()")
+           nil))))
