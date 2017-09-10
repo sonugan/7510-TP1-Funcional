@@ -234,7 +234,7 @@
             )
             ;quitar los espacios de la query y validarla
             (if (canEvaluateQuery parsedDatabase cleanQuery)
-              (let [sentence (getDatabaseSentence parsedDatabase cleanQuery)];TODO: tomar solo una sentence, para el caso en que esté repetidas
+              (let [sentence (getDatabaseSentence parsedDatabase cleanQuery)]
                 (evaluate database sentence cleanQuery)
               )
               nil
